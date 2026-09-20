@@ -171,19 +171,26 @@ Docker has to be running.
 
 **To watch the guarantee fail:** delete the `@Lock(LockModeType.PESSIMISTIC_WRITE)` line from `SeatRepository.lockSeatsForUpdate` and run `ConcurrentHoldTest` again. More than one thread will win. That one-line experiment is the most useful thing in this repository — it is the difference between knowing the pattern and having seen it break.
 
-## Three-day build plan
+## Where to look
 
-**Day 1 — domain and layout.** `Show`, `Seat`, `SeatHold`, `Booking`; Postgres via docker-compose; create-show and seat-map endpoints; `SeatBookingServiceTest` for the sequential rules.
+If you read one file, make it
+[`SeatBookingService`](src/main/java/com/atulit/seatbooking/service/SeatBookingService.java).
+Its `hold()` method is where the lock is taken and the guarantee is enforced, and the
+comments there explain each decision rather than restating the code.
 
-**Day 2 — the hard part.** Hold, confirm and release inside transactions; the pessimistic lock; the sorted lock order; `ConcurrentHoldTest`. Budget the most time here — this is the part worth talking about.
-
-**Day 3 — make it real.** Expiry sweeper and `HoldExpiryTest`; error handling and status codes; `SeatBookingApiTest`; Dockerfile; CI; this README.
-
-If you fall behind, cut in this order: CI, then the API tests, then the expiry sweeper. Keep the concurrency test — it is the project.
+| Path | What's in it |
+|---|---|
+| `service/SeatBookingService.java` | Hold, confirm, release — lock order and transaction boundaries |
+| `repository/SeatRepository.java` | The locked queries: `@Lock(PESSIMISTIC_WRITE)` and `ORDER BY id` |
+| `service/HoldExpirySweeper.java` | Background reclaim, taking locks in the same order to stay deadlock-free |
+| `security/SecurityConfig.java` | What is public and what needs a token |
+| `web/ApiExceptionHandler.java` | How domain exceptions become 409 / 410 / 403 |
+| `src/test/java/…/ConcurrentHoldTest.java` | The tests that justify all of the above |
+| `src/main/resources/static/` | The browser client — plain JavaScript, no build step |
 
 ## Roadmap
 
-One new thing per iteration, rather than all at once:
+Deliberately one new idea at a time, so each can be understood on its own:
 
 - **Optimistic locking** as an alternative strategy (`@Version`), and a benchmark of the two under contention
 - **Redis** caching for the seat map, which is read far more often than it is written
