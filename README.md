@@ -1,8 +1,10 @@
 # Seat Booking Service
 
+[![CI](https://github.com/Atul1t/seat-booking-service/actions/workflows/ci.yml/badge.svg)](https://github.com/Atul1t/seat-booking-service/actions/workflows/ci.yml)
+
 A seat reservation API built around a single guarantee: **the same seat is never sold twice**, no matter how many people click "Book" at the same moment.
 
-Spring Boot 3 · Java 21 · PostgreSQL · Docker · GitHub Actions
+Spring Boot 3 · Java 21 · Spring Security (JWT) · PostgreSQL · Docker · GitHub Actions
 
 ---
 
@@ -70,6 +72,10 @@ With Docker (Postgres included):
 docker compose up --build
 ```
 
+Then open <http://localhost:8080>. A browser client ships with the service — plain
+JavaScript, no build step — for browsing shows, picking seats off the map, and watching the
+hold countdown run down during checkout.
+
 Locally against your own Postgres:
 
 ```bash
@@ -90,34 +96,56 @@ mvn clean verify
 ## Try it
 
 ```bash
-# Create a show with 3 rows of 4 seats
+# 1. Register, then log in for a token
+curl -X POST localhost:8080/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"hunter2hunter2","displayName":"You"}'
+
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"hunter2hunter2"}' \
+  | sed 's/.*"token":"\([^"]*\)".*/\1/')
+
+# 2. Create a show with 3 rows of 4 seats
 curl -X POST localhost:8080/api/shows \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"title":"Interstellar","startsAt":"2026-12-01T18:30:00Z","rows":3,"seatsPerRow":4}'
 
-# See the seat map
+# 3. See the seat map — browsing is public, no token needed
 curl localhost:8080/api/shows/1/seats
 
-# Hold two seats
+# 4. Hold two seats. Who you are comes from the token, not the body.
 curl -X POST localhost:8080/api/shows/1/holds \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"customerRef":"atulit","seatIds":[1,2]}'
+  -d '{"seatIds":[1,2]}'
 
-# Confirm
-curl -X POST localhost:8080/api/holds/1/confirm
+# 5. Confirm, within two minutes
+curl -X POST localhost:8080/api/holds/1/confirm \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## API
 
-| Method | Path | Returns | Notes |
-|---|---|---|---|
-| `POST` | `/api/shows` | 201 | Creates a show and lays out its seat grid |
-| `GET` | `/api/shows/{id}/seats` | 200 | Seat map with availability |
-| `POST` | `/api/shows/{id}/holds` | 201 | **409** if any seat is already taken |
-| `GET` | `/api/holds/{id}` | 200 | |
-| `POST` | `/api/holds/{id}/confirm` | 200 | **410** if the hold expired first |
-| `DELETE` | `/api/holds/{id}` | 204 | Releases the seats |
-| `GET` | `/api/bookings/{reference}` | 200 | |
+| Method | Path | Token | Returns | Notes |
+|---|---|---|---|---|
+| `POST` | `/api/auth/register` | — | 201 | Email, password (8+ chars), display name |
+| `POST` | `/api/auth/login` | — | 200 | Returns a JWT, valid for two hours |
+| `GET` | `/api/auth/me` | required | 200 | Who the token says you are |
+| `GET` | `/api/shows` | — | 200 | Catalogue with live availability counts |
+| `POST` | `/api/shows` | required | 201 | Creates a show and lays out its seat grid |
+| `GET` | `/api/shows/{id}/seats` | — | 200 | Seat map with availability |
+| `POST` | `/api/shows/{id}/holds` | required | 201 | **409** if any seat is already taken |
+| `GET` | `/api/holds/{id}` | required | 200 | **403** if the hold is someone else's |
+| `POST` | `/api/holds/{id}/confirm` | required | 200 | **410** if the hold expired first |
+| `DELETE` | `/api/holds/{id}` | required | 204 | Releases the seats |
+| `GET` | `/api/bookings` | required | 200 | Your bookings, newest first |
+| `GET` | `/api/bookings/{reference}` | required | 200 | **403** if the booking is someone else's |
+
+Browsing is public; anything that touches a seat or a booking needs a bearer token. Identity
+is always read from the token, never from the request body — a client that could name its own
+customer could name somebody else's.
 
 A Postman collection lives in `postman/`. Import it, start the app, and run the requests
 in order — ids are captured into collection variables automatically, so nothing needs
@@ -141,7 +169,7 @@ started by Testcontainers, because row locking is the database's behaviour rathe
 application's — proving it on a different engine than production proves nothing. That is why
 Docker has to be running.
 
-**To watch the guarantee fail:** delete the `@Lock(LockModeType.PESSIMISTIC_WRITE)` line from `SeatRepository.lockSeatsForUpdate` and run `ConcurrentHoldTest` again. More than one thread will win. That two-line experiment is the most useful thing in this repository — it is the difference between knowing the pattern and having seen it break.
+**To watch the guarantee fail:** delete the `@Lock(LockModeType.PESSIMISTIC_WRITE)` line from `SeatRepository.lockSeatsForUpdate` and run `ConcurrentHoldTest` again. More than one thread will win. That one-line experiment is the most useful thing in this repository — it is the difference between knowing the pattern and having seen it break.
 
 ## Three-day build plan
 
