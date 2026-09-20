@@ -1,0 +1,22 @@
+# Profile for tests that run against a real PostgreSQL started by Testcontainers.
+# Deliberately sets no datasource url: @ServiceConnection on the container field
+# supplies the url, username and password at runtime.
+spring:
+  datasource:
+    hikari:
+      # The concurrency test runs 50 threads; give them room so they queue on the
+      # row lock, which is what we are testing, rather than on the connection pool.
+      maximum-pool-size: 25
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+booking:
+  hold-duration: PT2M
+  expiry-sweep-interval-ms: 3600000
+
+logging:
+  level:
+    com.atulit.seatbooking: INFO

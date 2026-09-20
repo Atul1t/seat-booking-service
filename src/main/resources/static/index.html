@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aisle — Seat Booking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div class="glow"></div>
+
+<header class="topbar">
+  <button class="brand" id="brand">
+    <span class="brandmark"></span>Aisle
+  </button>
+  <nav class="topnav" id="topnav" hidden>
+    <button class="linkish" id="navShows">Shows</button>
+    <button class="linkish" id="navBookings">My bookings</button>
+    <span class="avatar" id="avatar"></span>
+    <button class="ghost small" id="navLogout">Log out</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ─────────────── auth ─────────────── -->
+  <section id="screen-auth" class="screen">
+    <div class="auth-wrap">
+      <div class="auth-pitch">
+        <h1 class="display">Pick your seats.<br>Keep them.</h1>
+        <p class="lede">Seats are held for two minutes while you check out — and nobody
+           else can take them in that window. Not even if they click at the same instant.</p>
+      </div>
+
+      <div class="card auth-card">
+        <div class="tabs">
+          <button class="tab active" data-tab="login">Sign in</button>
+          <button class="tab" data-tab="register">Create account</button>
+        </div>
+
+        <form id="loginForm" class="stack">
+          <label>Email<input type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>
+          <label>Password<input type="password" name="password" required autocomplete="current-password" placeholder="••••••••"></label>
+          <button class="primary block" type="submit">Sign in</button>
+        </form>
+
+        <form id="registerForm" class="stack" hidden>
+          <label>Name<input name="displayName" required maxlength="80" placeholder="Your name"></label>
+          <label>Email<input type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>
+          <label>Password<input type="password" name="password" required minlength="8"
+                 autocomplete="new-password" placeholder="At least 8 characters"></label>
+          <button class="primary block" type="submit">Create account</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── shows ─────────────── -->
+  <section id="screen-shows" class="screen" hidden>
+    <div class="pagehead">
+      <h1 class="display">What's on</h1>
+      <p class="lede">Four screens, tonight and this weekend.</p>
+    </div>
+    <div class="showgrid" id="showList"></div>
+  </section>
+
+  <!-- ─────────────── seating ─────────────── -->
+  <section id="screen-seating" class="screen" hidden>
+    <button class="linkish back" id="backToShows">&larr;&nbsp; All shows</button>
+
+    <div class="pagehead">
+      <h1 class="display" id="seatingTitle"></h1>
+      <p class="lede" id="seatingWhen"></p>
+    </div>
+
+    <div class="auditorium">
+      <div class="screenbar"><span>screen</span></div>
+      <div class="seatmap" id="seatMap"></div>
+    </div>
+
+    <div class="legend">
+      <span><i class="swatch available"></i>Available</span>
+      <span><i class="swatch selected"></i>Selected</span>
+      <span><i class="swatch held"></i>Held</span>
+      <span><i class="swatch booked"></i>Sold</span>
+    </div>
+
+    <div class="actionbar">
+      <div id="selectionSummary" class="muted">No seats selected</div>
+      <button class="primary" id="holdButton" disabled>Hold seats</button>
+    </div>
+  </section>
+
+  <!-- ─────────────── checkout ─────────────── -->
+  <section id="screen-checkout" class="screen" hidden>
+    <div class="card checkout-card">
+      <h1 class="display">Almost yours</h1>
+      <p class="lede">These seats are held. If the ring empties, they go back on sale.</p>
+
+      <div class="timer">
+        <svg class="timer-ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+          <circle class="ring-progress" id="ringProgress" cx="60" cy="60" r="52"></circle>
+        </svg>
+        <div class="timer-face">
+          <div class="countdown" id="countdown">--:--</div>
+          <div class="timer-label">left</div>
+        </div>
+      </div>
+
+      <dl class="summary">
+        <dt>Show</dt><dd id="checkoutShow"></dd>
+        <dt>Seats</dt><dd id="checkoutSeats"></dd>
+      </dl>
+
+      <div class="row">
+        <button class="ghost" id="cancelHold">Cancel</button>
+        <button class="primary" id="confirmHold">Confirm booking</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── ticket ─────────────── -->
+  <section id="screen-ticket" class="screen" hidden>
+    <div class="ticket">
+      <div class="ticket-body">
+        <div class="tick">&#10003;</div>
+        <h1 class="display">You're in</h1>
+        <dl class="summary">
+          <dt>Show</dt><dd id="ticketShow"></dd>
+          <dt>Seats</dt><dd id="ticketSeats"></dd>
+          <dt>Name</dt><dd id="ticketName"></dd>
+        </dl>
+      </div>
+      <div class="ticket-rip"><i></i><i></i></div>
+      <div class="ticket-stub">
+        <div class="stub-label">Booking reference</div>
+        <div class="reference" id="ticketRef"></div>
+        <div class="barcode"></div>
+      </div>
+    </div>
+    <div class="center"><button class="ghost" id="ticketDone">Book more seats</button></div>
+  </section>
+
+  <!-- ─────────────── my bookings ─────────────── -->
+  <section id="screen-bookings" class="screen" hidden>
+    <div class="pagehead">
+      <h1 class="display">My bookings</h1>
+    </div>
+    <div id="bookingList" class="stack"></div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

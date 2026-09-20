@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:seatbooking;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;LOCK_TIMEOUT=15000
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+    hikari:
+      # The concurrency test runs 50 threads; give them room so they queue on the
+      # row lock (which is what we are testing) rather than on the connection pool.
+      maximum-pool-size: 25
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+booking:
+  hold-duration: PT2M
+  # Effectively off during tests: the expiry tests call sweep() directly so they
+  # do not have to wait for a timer.
+  expiry-sweep-interval-ms: 3600000
+
+logging:
+  level:
+    com.atulit.seatbooking: INFO
+    # Uncomment to watch the SQL Hibernate generates, including the "for update"
+    # clause that @Lock(PESSIMISTIC_WRITE) adds to the seat query:
+    # org.hibernate.SQL: DEBUG

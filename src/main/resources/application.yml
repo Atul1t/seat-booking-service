@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: seat-booking-service
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/seatbooking}
+    username: ${DB_USER:seatbooking}
+    password: ${DB_PASSWORD:seatbooking}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+security:
+  jwt:
+    # Dev default. In any real deployment this comes from the environment and is
+    # rotated; a leaked signing key lets anyone mint tokens for any user.
+    secret: ${JWT_SECRET:dev-only-signing-key-change-me-at-least-32-bytes}
+    # Short on purpose: a JWT cannot be revoked before it expires, so the expiry
+    # window is the blast radius of a stolen token.
+    ttl: PT2H
+
+booking:
+  # How long a hold survives before the sweeper releases it.
+  hold-duration: PT2M
+  # How often the sweeper runs.
+  expiry-sweep-interval-ms: 10000
+
+server:
+  error:
+    include-message: always
+
+logging:
+  level:
+    com.atulit.seatbooking: INFO

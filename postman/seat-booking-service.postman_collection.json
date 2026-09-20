@@ -1,0 +1,490 @@
+{
+  "info": {
+    "name": "Seat Booking Service",
+    "description": "Walks the full hold -> confirm -> release flow.\\n\\nRun the requests in order (or use Postman's Collection Runner). Ids are captured into collection variables automatically, so nothing needs copying by hand.\\n\\nRequest 4 is the one worth watching: it proves a held seat cannot be taken by a second customer.\\n\\nTo see hold expiry, run request 3, wait past the expiresAt it returns (two minutes), then run request 6 - you should get 410 Gone.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "showId",
+      "value": ""
+    },
+    {
+      "key": "seatA1",
+      "value": ""
+    },
+    {
+      "key": "seatA2",
+      "value": ""
+    },
+    {
+      "key": "seatB1",
+      "value": ""
+    },
+    {
+      "key": "seatB2",
+      "value": ""
+    },
+    {
+      "key": "holdId",
+      "value": ""
+    },
+    {
+      "key": "holdToCancel",
+      "value": ""
+    },
+    {
+      "key": "bookingRef",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create show (3 rows x 4 seats)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/shows",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shows"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Interstellar\",\n  \"startsAt\": \"2026-12-01T18:30:00Z\",\n  \"rows\": 3,\n  \"seatsPerRow\": 4\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('showId', b.id);",
+              "console.log('showId =', b.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Seat map",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/shows/{{showId}}/seats",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shows",
+            "{{showId}}",
+            "seats"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const seats = pm.response.json().seats;",
+              "const byLabel = l => seats.find(s => s.label === l).id;",
+              "pm.collectionVariables.set('seatA1', byLabel('A1'));",
+              "pm.collectionVariables.set('seatA2', byLabel('A2'));",
+              "pm.collectionVariables.set('seatB1', byLabel('B1'));",
+              "pm.collectionVariables.set('seatB2', byLabel('B2'));",
+              "pm.test('all seats start available', () =>",
+              "  pm.expect(seats.every(s => s.status === 'AVAILABLE')).to.be.true);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Hold A1 + A2",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/shows/{{showId}}/holds",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shows",
+            "{{showId}}",
+            "holds"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerRef\": \"atulit\",\n  \"seatIds\": [\n    \"{{seatA1}}\",\n    \"{{seatA2}}\"\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('holdId', b.holdId);",
+              "pm.test('status ACTIVE', () => pm.expect(b.status).to.eql('ACTIVE'));",
+              "console.log('hold', b.holdId, 'expires at', b.expiresAt);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. THE IMPORTANT ONE - someone else tries for A1 (expect 409)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/shows/{{showId}}/holds",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shows",
+            "{{showId}}",
+            "holds"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerRef\": \"someone-else\",\n  \"seatIds\": [\n    \"{{seatA1}}\"\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('409 Conflict - the row lock did its job', () =>",
+              "  pm.response.to.have.status(409));",
+              "const b = pm.response.json();",
+              "pm.test('names the contended seat', () =>",
+              "  pm.expect(b.details).to.include('A1'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Read the hold back",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/holds/{{holdId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "holds",
+            "{{holdId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Confirm the hold",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/holds/{{holdId}}/confirm",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "holds",
+            "{{holdId}}",
+            "confirm"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.collectionVariables.set('bookingRef', b.reference);",
+              "pm.test('booking reference issued', () =>",
+              "  pm.expect(b.reference).to.match(/^BK/));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Confirm again (expect 409 - already confirmed)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/holds/{{holdId}}/confirm",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "holds",
+            "{{holdId}}",
+            "confirm"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+              "pm.test('hold_not_active', () =>",
+              "  pm.expect(pm.response.json().error).to.eql('hold_not_active'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Look up the booking",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings/{{bookingRef}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "bookings",
+            "{{bookingRef}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Hold B1 + B2 (to cancel)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/shows/{{showId}}/holds",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shows",
+            "{{showId}}",
+            "holds"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerRef\": \"changed-my-mind\",\n  \"seatIds\": [\n    \"{{seatB1}}\",\n    \"{{seatB2}}\"\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('holdToCancel', pm.response.json().holdId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Release it (expect 204)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/holds/{{holdToCancel}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "holds",
+            "{{holdToCancel}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Seat map again - A1/A2 booked, B1/B2 free",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/shows/{{showId}}/seats",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "shows",
+            "{{showId}}",
+            "seats"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const seats = pm.response.json().seats;",
+              "const status = l => seats.find(s => s.label === l).status;",
+              "pm.test('A1 booked', () => pm.expect(status('A1')).to.eql('BOOKED'));",
+              "pm.test('A2 booked', () => pm.expect(status('A2')).to.eql('BOOKED'));",
+              "pm.test('B1 released', () => pm.expect(status('B1')).to.eql('AVAILABLE'));",
+              "pm.test('B2 released', () => pm.expect(status('B2')).to.eql('AVAILABLE'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Not found (expect 404)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/bookings/BKNOPE1234",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "bookings",
+            "BKNOPE1234"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+              "pm.test('not_found', () =>",
+              "  pm.expect(pm.response.json().error).to.eql('not_found'));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
